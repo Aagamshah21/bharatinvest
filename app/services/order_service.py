@@ -9,6 +9,7 @@ from typing import Tuple, Optional
 from sqlalchemy.orm import Session
 from app.models import Order, Trade, Holding, Position, Wallet, LedgerEntry, Instrument, User
 from app.services.price_simulator import get_market_open_status, get_live_price
+from app.services.outbox_service import enqueue_holdings_event, dispatch_outbox_event_async
 
 logger = logging.getLogger("order_flow")
 
@@ -247,11 +248,17 @@ def place_order(
             db.add(order)
             db.flush() # Populate order.id without committing
 
+            outbox_event = None
             if should_execute:
                 _apply_trade_and_ledger(db, order, round(exec_price, 2))
+                if order.product_type == "DELIVERY":
+                    outbox_event = enqueue_holdings_event(db, user.email)
 
             db.commit()
             db.refresh(order)
+
+            if outbox_event:
+                dispatch_outbox_event_async(outbox_event.id)
 
             logger.info(f"[{rid}] [ORDER_RESULT] order_id={order.id} status={order.status} exec_price={order.executed_price}")
             return order, None
@@ -469,7 +476,14 @@ def check_and_execute_pending_orders(db: Session):
                     order.status = "COMPLETE"
                     order.updated_at = datetime.now(timezone.utc)
                     _apply_trade_and_ledger(db, order, float(exec_price_dec))
+                    outbox_ev = None
+                    if order.product_type == "DELIVERY":
+                        user_obj = db.query(User).filter(User.id == order.user_id).first()
+                        if user_obj:
+                            outbox_ev = enqueue_holdings_event(db, user_obj.email)
                     db.commit()
+                    if outbox_ev:
+                        dispatch_outbox_event_async(outbox_ev.id)
                 except Exception as e:
                     db.rollback()
                     logger.error(f"Pending order execution error for order {order.id}: {e}")

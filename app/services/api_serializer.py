@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
+from app.config import settings
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -108,7 +109,7 @@ def serialize_holding(holding, user) -> Dict[str, Any]:
             "day_percent": fmt_str_2dec(day_pct)
         },
         "demat": {
-            "dp_name": "BharatInvest Securities",
+            "dp_name": getattr(settings, "DP_NAME", "BharatInvest Securities"),
             "account": masked_demat
         }
     }

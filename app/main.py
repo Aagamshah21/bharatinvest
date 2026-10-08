@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +15,7 @@ from app.middleware import ExternalApiMiddleware, SessionSlidingMiddleware
 from app.services.api_serializer import format_indian_currency, fmt_iso_ist
 from app.services.price_simulator import update_prices_tick
 
-from app.routers import web_auth, web_pages, web_actions, oauth, api_v2, admin
+from app.routers import web_auth, web_pages, web_actions, oauth, api_v2, admin, internal_api
 
 # Background task for price updating every 5 seconds
 async def price_simulator_task():
@@ -80,6 +81,7 @@ app.include_router(web_actions.router)
 app.include_router(oauth.router)
 app.include_router(api_v2.router)
 app.include_router(admin.router)
+app.include_router(internal_api.router)
 
 @app.get("/health")
 async def health_check():

@@ -255,3 +255,20 @@ class SystemSettings(Base):
 
     key = Column(String(100), primary_key=True)
     value = Column(String(255), nullable=False)
+
+
+class OutboxEvent(Base):
+    __tablename__ = "outbox_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_type = Column(String(50), nullable=False, default="HOLDINGS_CHANGED")
+    email = Column(String(100), nullable=False, index=True)
+    provider = Column(String(10), default="b")
+    payload = Column(Text, nullable=False)
+    status = Column(String(20), default="PENDING", index=True)
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=10)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    last_attempt_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+

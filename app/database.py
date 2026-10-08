@@ -34,6 +34,11 @@ def run_db_migrations(target_engine=None):
     """
     if target_engine is None:
         target_engine = engine
+    try:
+        import app.models
+        Base.metadata.create_all(bind=target_engine)
+    except Exception:
+        pass
     from sqlalchemy import inspect, text
     inspector = inspect(target_engine)
     table_names = inspector.get_table_names()

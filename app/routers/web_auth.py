@@ -12,6 +12,8 @@ from app.config import settings
 from app.database import get_db
 from app.models import User, Wallet, LedgerEntry, Watchlist, WatchlistItem, Instrument, Holding
 from app.services.auth_service import verify_password, hash_password, create_web_session_token, decode_web_session_token
+from app.shared_identity import normalize_email, generate_identity
+from app.starter_portfolio import seed_starter_portfolio
 
 router = APIRouter()
 
@@ -109,7 +111,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             userinfo = {}
 
     google_sub = str(userinfo.get("sub") or "")
-    email = (userinfo.get("email") or "").strip().lower()
+    email = normalize_email(userinfo.get("email") or "")
     email_verified = bool(userinfo.get("email_verified", False))
     full_name = (userinfo.get("name") or (email.split("@")[0] if email else "Google User")).strip()
     picture_url = userinfo.get("picture")
@@ -123,18 +125,20 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
     # Check ALLOWED_EMAILS if configured
     if settings.ALLOWED_EMAILS:
-        allowed = [e.strip().lower() for e in settings.ALLOWED_EMAILS.split(",") if e.strip()]
+        allowed = [e.strip().lower() for e in (settings.ALLOWED_EMAILS if isinstance(settings.ALLOWED_EMAILS, list) else settings.ALLOWED_EMAILS.split(",")) if e.strip()]
         if allowed and email not in allowed:
             return RedirectResponse(url="/login?error=" + quote("Access restricted. Your email is not authorized to sign in."), status_code=status.HTTP_302_FOUND)
 
     # 1. Match by google_sub
     user = db.query(User).filter(User.google_sub == google_sub).first()
     if not user:
-        # 2. Match by lowercase email and link Google account
+        # 2. Match by normalized email and link Google account to provisioned user
         user = db.query(User).filter(User.email == email).first()
         if user:
             user.google_sub = google_sub
             user.auth_provider = "google"
+            if full_name and (not user.full_name or user.full_name in ("User", "Google User")):
+                user.full_name = full_name
             if picture_url:
                 user.picture_url = picture_url
             user.last_login_at = datetime.now(timezone.utc)
@@ -142,28 +146,20 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             db.refresh(user)
 
     if not user:
-        # 3. Create new user with starting capital
-        count = db.query(User).count() + 1
-        client_code = f"BI{10020 + count}"
-
-        # FAKE masked PAN and demat number
-        pan_prefix = "".join(random.choices(string.ascii_uppercase, k=2))
-        pan_mid = "".join(random.choices(string.digits, k=3))
-        pan_suffix = random.choice(string.ascii_uppercase)
-        pan_masked = f"{pan_prefix}XXX{pan_mid}{pan_suffix}"
-        demat_account = f"12081600{random.randint(10000000, 99999999)}"
+        # 3. Create new user with deterministic identity and starting capital
+        identity = generate_identity(email, full_name=full_name)
 
         user = User(
             google_sub=google_sub,
-            mobile=None,
+            mobile=identity["mobile"],
             password_hash=None,
-            full_name=full_name,
-            client_code=client_code,
+            full_name=identity["full_name"],
+            client_code=identity["client_code"],
             email=email,
             picture_url=picture_url,
             auth_provider="google",
-            pan_masked=pan_masked,
-            demat_account=demat_account,
+            pan_masked=identity["pan_masked"],
+            demat_account=identity["demat_account"],
             created_at=datetime.now(timezone.utc),
             last_login_at=datetime.now(timezone.utc)
         )
@@ -193,11 +189,9 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             if inst:
                 db.add(WatchlistItem(watchlist_id=w.id, instrument_id=inst.id))
 
-        # Optional starter portfolio
+        # Seed deterministic starter portfolio if enabled
         if settings.SEED_STARTER_PORTFOLIO:
-            rel = db.query(Instrument).filter(Instrument.symbol == "RELIANCE").first()
-            if rel:
-                db.add(Holding(user_id=user.id, instrument_id=rel.id, quantity=5, average_price=rel.current_price))
+            seed_starter_portfolio(db, user)
 
         db.commit()
     else:
@@ -251,7 +245,7 @@ async def register_submit(
         password_hash=hash_password(password),
         full_name=full_name.strip(),
         client_code=client_code,
-        email=email.strip().lower(),
+        email=normalize_email(email),
         pan_masked=masked_pan,
         demat_account=masked_demat,
         created_at=datetime.now(timezone.utc),
@@ -279,6 +273,9 @@ async def register_submit(
         if inst:
             db.add(WatchlistItem(watchlist_id=w.id, instrument_id=inst.id))
     db.commit()
+
+    if settings.SEED_STARTER_PORTFOLIO:
+        seed_starter_portfolio(db, new_user)
 
     session_token = create_web_session_token(new_user.id, expiry_minutes=60)
     response = RedirectResponse(url="/home", status_code=status.HTTP_302_FOUND)

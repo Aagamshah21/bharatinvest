@@ -7,6 +7,7 @@ from app.models import (
     OAuthToken, ApiLog, SystemSettings
 )
 from app.services.order_service import place_order
+from app.services.outbox_service import enqueue_holdings_event, dispatch_outbox_event_async
 
 def get_system_flag(db: Session, key: str, default: str = "false") -> str:
     setting = db.query(SystemSettings).filter(SystemSettings.key == key).first()
@@ -85,5 +86,15 @@ def admin_edit_holding(db: Session, user_id: int, symbol: str, quantity: int, av
         else:
             holding.quantity = quantity
             holding.average_price = avg_price
+
+    user = db.query(User).filter(User.id == user_id).first()
+    outbox_ev = None
+    if user:
+        outbox_ev = enqueue_holdings_event(db, user.email)
+
     db.commit()
+
+    if outbox_ev:
+        dispatch_outbox_event_async(outbox_ev.id)
+
     return True, "Holding updated"

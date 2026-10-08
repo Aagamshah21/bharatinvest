@@ -189,9 +189,9 @@ curl -H "X-Auth-Token: ACCESS_TOKEN_HERE" http://localhost:8000/v2/portfolio/hol
 
 ## 🧪 Automated Test Suite
 
-Run the full automated test suite (21 unit and integration tests):
+Run the full automated test suite (39 unit and integration tests):
 ```bash
-python -m pytest -v
+python -m pytest -v -k "not test_playwright_e2e"
 ```
 
 Tests verify:
@@ -208,3 +208,84 @@ Tests verify:
 - Strict per-user data isolation across holdings, orders, watchlists, and apps
 - Data persistence across simulated app restart
 - Admin reset protection preserving real Google users
+- **TradeOne Integration**:
+  - Shared identity generation & deterministic normalization
+  - Deterministic starter portfolios with Provider B theme (stocks + ETFs + 1 InvIT)
+  - Overlapping ISINs (RELIANCE, TCS, HDFCBANK) within ±15% price bands
+  - Secure internal endpoints (`/internal/v1/users/*`)
+  - Constant-time `x-internal-key` authentication and 60 req/min rate limiting
+  - Public holdings response structure and pagination parity
+  - Outbox pattern and async TradeOne webhook notifications with 10x exponential retry
+
+---
+
+## 🔗 TradeOne Broker Integration & Internal APIs
+
+BharatInvest is configured as **Provider B** in the TradeOne ecosystem:
+- **Broker Name**: `BharatInvest`
+- **Provider Code**: `b`
+- **DP Name**: `BharatInvest Securities`
+- **DP ID**: `IN300002`
+
+### Environment Configuration
+```ini
+BROKER_NAME=BharatInvest
+PROVIDER_CODE=b
+DP_NAME=BharatInvest Securities
+DP_ID=IN300002
+
+SHARED_IDENTITY_SALT=tradeone-shared-salt-2026
+INTERNAL_API_ENABLED=true
+INTERNAL_API_KEY=tradeone-internal-secret-key-2026
+TRADEONE_URL=http://localhost:8080
+```
+
+### 1. Shared Identity (`app/shared_identity.py`)
+- `normalize_email(email)`: Converts email to lowercase and strips all surrounding/internal whitespace.
+- `generate_identity(email, full_name=None)`: Deterministic HMAC-SHA256 hash using `SHARED_IDENTITY_SALT`. Produces identical fake profiles across NiftyTrade, BharatInvest, BondBazaar, and TradeOne.
+  - Names derived from Google OIDC claim or email local-part.
+  - Generates fake non-real-looking PAN (`FAKEPANXXXXX`) and Aadhaar (`FAKEXXXXXXXX`).
+
+### 2. Deterministic Starter Portfolio (`app/starter_portfolio.py`)
+- Derived from `instruments_shared.json` for new non-demo users.
+- **Provider B Theme**: Stocks + ETFs + 1 InvIT.
+- Includes 2-3 overlapping ISINs (`RELIANCE`: `INE002A01018`, `TCS`: `INE467B01029`, `HDFCBANK`: `INE040A01034`).
+- Average purchase price strictly within ±15% of the instrument's current live price.
+- Starting wallet balance set to ₹10,00,000.
+- Demo users (`aarav@example.com`, `priya@example.com`) are never altered.
+
+### 3. Internal Endpoints (`/internal/v1/*`)
+Active when `INTERNAL_API_ENABLED=true`.
+
+#### Security & Authentication
+- Header: `x-internal-key` verified via constant-time HMAC comparison (`hmac.compare_digest`).
+- Missing or invalid key yields `401 Unauthorized`.
+- Key is never logged.
+- Rate limited to **60 requests per minute** per client (returns `429 Too Many Requests`).
+
+#### Endpoints:
+- **`POST /internal/v1/users/provision`**
+  - Body: `{"email": "user@example.com", "name": "Optional Name"}`
+  - Idempotently creates user with fake identity, ₹10,00,000 wallet, default watchlist, and deterministic starter portfolio.
+- **`GET /internal/v1/users/{email}/profile`**
+  - Returns user profile including `client_code`, `pan`, `demat_account`, `dp_name`, `dp_id`, and `provider`.
+- **`GET /internal/v1/users/{email}/holdings?page=1&page_size=20`**
+  - Matches the existing public API `/v2/portfolio/stocks` structure and pagination envelopes exactly (`success`, `meta`, `data`).
+- **`GET /internal/v1/users/{email}/summary`**
+  - Returns aggregate portfolio metrics: total invested, current market value, total P&L, wallet balance, and total portfolio valuation.
+
+### 4. Outbox Event & Asynchronous Webhook
+- Every committed delivery holdings change (order execution, admin edit, or user provisioning) enqueues a record in `outbox_events`.
+- Asynchronously notifies `{TRADEONE_URL}/internal/v1/events` via a background worker thread.
+- Notification body:
+  ```json
+  {
+    "provider": "b",
+    "email": "user@example.com",
+    "event": "HOLDINGS_CHANGED",
+    "occurredAt": "2026-10-09T01:30:00+05:30"
+  }
+  ```
+- Retries up to **10 times with exponential backoff**.
+- Worker execution is non-blocking and will **never** fail or delay trading execution.
+
