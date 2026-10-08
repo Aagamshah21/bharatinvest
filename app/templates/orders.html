@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% set page_title = "Orders & Order History" %}
+
+{% block content %}
+<!-- Pending Orders -->
+<div class="card" style="margin-bottom: 32px;">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px; color: var(--primary-teal);">⏳ Pending Orders</h3>
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Symbol</th>
+          <th>Type</th>
+          <th>Order Type</th>
+          <th>Product</th>
+          <th>Qty</th>
+          <th>Price / Trigger</th>
+          <th>Placed At</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in pending_orders %}
+          {% set inst = o.instrument %}
+          <tr>
+            <td><code>#{{ o.id }}</code></td>
+            <td><strong style="color: var(--primary-teal);">{{ inst.symbol }}</strong></td>
+            <td><span class="{% if o.transaction_type == 'BUY' %}badge-gain{% else %}badge-loss{% endif %}">{{ o.transaction_type }}</span></td>
+            <td>{{ o.order_type }}</td>
+            <td>{{ o.product_type }}</td>
+            <td>{{ o.quantity }}</td>
+            <td>
+              {% if o.order_type == 'LIMIT' %}
+                ₹{{ "%.2f"|format(o.price) }}
+              {% elif o.order_type == 'STOP_LOSS' %}
+                Trig: ₹{{ "%.2f"|format(o.trigger_price) }}
+              {% else %}
+                MARKET
+              {% endif %}
+            </td>
+            <td>{{ o.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            <td>
+              <button onclick="cancelPendingOrder({{ o.id }})" class="btn btn-outline" style="padding: 4px 10px; font-size: 0.8rem; color: var(--red-loss);">Cancel</button>
+            </td>
+          </tr>
+        {% endfor %}
+        {% if not pending_orders %}
+          <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">No pending orders currently active.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Completed & Past Order History -->
+<div class="card">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px;">📜 Order History</h3>
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Symbol</th>
+          <th>Transaction</th>
+          <th>Product</th>
+          <th>Qty</th>
+          <th>Exec Price</th>
+          <th>Status</th>
+          <th>Details / Reason</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in order_history %}
+          {% set inst = o.instrument %}
+          <tr>
+            <td><code>#{{ o.id }}</code></td>
+            <td><strong>{{ inst.symbol }}</strong></td>
+            <td><span class="{% if o.transaction_type == 'BUY' %}badge-gain{% else %}badge-loss{% endif %}">{{ o.transaction_type }}</span></td>
+            <td>{{ o.product_type }}</td>
+            <td>{{ o.quantity }}</td>
+            <td>₹{{ "%.2f"|format(o.executed_price or o.price) }}</td>
+            <td>
+              {% if o.status == 'COMPLETE' %}
+                <span class="badge-gain">COMPLETE</span>
+              {% elif o.status == 'REJECTED' %}
+                <span class="badge-loss">REJECTED</span>
+              {% else %}
+                <span style="background: rgba(100,100,100,0.1); padding: 4px 8px; border-radius: 6px;">{{ o.status }}</span>
+              {% endif %}
+            </td>
+            <td style="font-size: 0.85rem; color: var(--red-loss);">
+              {{ o.rejection_reason if o.rejection_reason else '-' }}
+            </td>
+            <td style="font-size: 0.85rem;">{{ o.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function cancelPendingOrder(orderId) {
+  fetch('/action/order/cancel/' + orderId, { method: 'POST' })
+    .then(r => r.json())
+    .then(res => { if (res.success) window.location.reload(); });
+}
+</script>
+{% endblock %}

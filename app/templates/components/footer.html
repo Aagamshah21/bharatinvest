@@ -1,0 +1,22 @@
+<footer class="simulated-footer-banner">
+  ⚠️ Simulated data - not a real broker. Built for BharatInvest mock aggregator sandbox.
+</footer>
+
+<!-- Bottom Tab Navigation for Mobile -->
+<div class="bottom-tab-bar">
+  <a href="/home" class="tab-item {% if request.url.path == '/home' %}active{% endif %}">
+    <span>📊</span><span>Home</span>
+  </a>
+  <a href="/explore" class="tab-item {% if request.url.path == '/explore' %}active{% endif %}">
+    <span>🔍</span><span>Explore</span>
+  </a>
+  <a href="/holdings" class="tab-item {% if request.url.path == '/holdings' %}active{% endif %}">
+    <span>💼</span><span>Holdings</span>
+  </a>
+  <a href="/orders" class="tab-item {% if request.url.path == '/orders' %}active{% endif %}">
+    <span>📜</span><span>Orders</span>
+  </a>
+  <a href="/profile" class="tab-item {% if request.url.path == '/profile' %}active{% endif %}">
+    <span>👤</span><span>Profile</span>
+  </a>
+</div>

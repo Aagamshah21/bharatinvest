@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set page_title = "Delivery Holdings" %}
+
+{% block content %}
+<!-- Portfolio Holdings Header Summary -->
+<div class="grid-cols-3" style="margin-bottom: 24px;">
+  <div class="card">
+    <div style="font-size: 0.85rem; color: var(--text-muted);">Total Current Value</div>
+    <div id="summaryTotalCurrent" style="font-size: 1.6rem; font-weight: 700; margin-top: 4px;">{{ summary.total_current | currency }}</div>
+  </div>
+  <div class="card">
+    <div style="font-size: 0.85rem; color: var(--text-muted);">Total Invested</div>
+    <div id="summaryTotalInvested" style="font-size: 1.6rem; font-weight: 700; margin-top: 4px;">{{ summary.total_invested | currency }}</div>
+  </div>
+  <div class="card">
+    <div style="font-size: 0.85rem; color: var(--text-muted);">Overall P&L</div>
+    <div id="summaryTotalReturn" style="font-size: 1.6rem; font-weight: 700; margin-top: 4px;" class="{% if summary.total_return_abs >= 0 %}val-gain{% else %}val-loss{% endif %}">
+      {% if summary.total_return_abs >= 0 %}+{% endif %}{{ summary.total_return_abs | currency }} ({{ "%.2f"|format(summary.total_return_pct) }}%)
+    </div>
+  </div>
+</div>
+
+<div class="table-container">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Instrument</th>
+        <th>Category</th>
+        <th>Qty</th>
+        <th>Avg Price (INR)</th>
+        <th>LTP (INR)</th>
+        <th>Invested Value</th>
+        <th>Current Value</th>
+        <th>Total P&L</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in holdings %}
+        {% set inst = h.instrument %}
+        {% set ltp = inst.current_price %}
+        {% set inv = h.quantity * h.average_price %}
+        {% set curr = h.quantity * ltp %}
+        {% set pnl = curr - inv %}
+        {% set pnl_pct = (pnl / inv * 100) if inv > 0 else 0 %}
+        <tr data-symbol="{{ inst.symbol }}" data-qty="{{ h.quantity }}" data-avg="{{ h.average_price }}">
+          <td>
+            <a href="/instrument/{{ inst.symbol }}" style="font-weight: 700; color: var(--primary-teal); text-decoration: none;">{{ inst.symbol }}</a>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">{{ inst.name }}</div>
+          </td>
+          <td><span class="client-badge">{{ inst.category }}</span></td>
+          <td style="font-weight: 700;">{{ h.quantity }}</td>
+          <td>{{ h.average_price | currency }}</td>
+          <td class="live-price" style="font-weight: 700;">{{ ltp | currency }}</td>
+          <td class="holding-inv">{{ inv | currency }}</td>
+          <td class="holding-curr" style="font-weight: 600;">{{ curr | currency }}</td>
+          <td class="holding-pnl">
+            <div class="pnl-abs {% if pnl >= 0 %}val-gain{% else %}val-loss{% endif %}" style="font-weight: 700;">
+              {% if pnl >= 0 %}+{% endif %}{{ pnl | currency }}
+            </div>
+            <span class="pnl-pct {% if pnl_pct >= 0 %}badge-gain{% else %}badge-loss{% endif %}">
+              {% if pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(pnl_pct) }}%
+            </span>
+          </td>
+          <td>
+            <div style="display: flex; gap: 6px;">
+              <button onclick="openBuySellModal('{{ inst.symbol }}', 'BUY', {{ ltp }})" class="btn btn-success" style="padding: 4px 10px; font-size: 0.8rem;">BUY MORE</button>
+              <button onclick="openBuySellModal('{{ inst.symbol }}', 'SELL', {{ ltp }})" class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;">SELL</button>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      {% if not holdings %}
+        <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 32px;">No delivery holdings in your portfolio. Explore stocks to invest!</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

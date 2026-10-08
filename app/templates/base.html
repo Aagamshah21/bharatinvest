@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}BharatInvest | App-First Stock Broker{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    {% include "components/sidebar.html" %}
+    
+    <div class="main-content">
+      {% include "components/navbar.html" %}
+      
+      <main class="page-container">
+        {% block content %}{% endblock %}
+      </main>
+      
+      {% include "components/footer.html" %}
+    </div>
+  </div>
+
+  {% if user %}
+    {% include "components/buy_sell_modal.html" %}
+  {% endif %}
+
+  <script>
+    window.userHoldings = window.userHoldings || {};
+    {% if user and user.holdings %}
+      {% for h in user.holdings %}
+        {% if h.quantity > 0 and h.instrument %}
+          window.userHoldings['{{ h.instrument.symbol }}'] = {
+            quantity: {{ h.quantity }},
+            average_price: {{ h.average_price }}
+          };
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  </script>
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <script>
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.setAttribute('role', 'alert');
+      const icon = type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️');
+      toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(40px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+    window.showToast = showToast;
+  </script>
+  <script src="/static/js/theme.js"></script>
+  <script src="/static/js/price_updates.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

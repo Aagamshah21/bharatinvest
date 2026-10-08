@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authorize App | BharatInvest</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0c141c 0%, #05668d 100%);
+    }
+    .consent-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 40px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      border: 1px solid var(--border-color);
+    }
+    .permission-box {
+      background: var(--bg-main);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin: 20px 0;
+      border-left: 4px solid var(--primary-teal);
+    }
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      background: var(--bg-main);
+      color: var(--text-main);
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="consent-card">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div class="brand-logo-icon" style="margin: 0 auto 12px auto; width: 48px; height: 48px; font-size: 1.5rem;">B</div>
+      <h2 style="font-weight: 700; font-size: 1.5rem; color: var(--text-main);">BharatInvest Connect</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">External App Authorization</p>
+    </div>
+
+    {% if error %}
+      <div style="background: var(--red-loss-bg); color: var(--red-loss); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; font-weight: 600;">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    {% if client_app %}
+      <div style="text-align: center; margin-bottom: 20px;">
+        <p style="font-size: 1rem; color: var(--text-main);">
+          <strong>{{ client_app.app_name }}</strong> is requesting permission to access your BharatInvest account.
+        </p>
+      </div>
+
+      <div class="permission-box">
+        <h4 style="font-weight: 700; font-size: 0.95rem; margin-bottom: 8px; color: var(--primary-teal);">Requested Permissions:</h4>
+        <ul style="padding-left: 20px; font-size: 0.9rem; color: var(--text-main);">
+          <li style="margin-bottom: 4px;">Read stock holdings & intraday positions</li>
+          <li style="margin-bottom: 4px;">Read completed order history & trades</li>
+          <li>Read profile client code & wallet balance</li>
+        </ul>
+      </div>
+
+      <form action="/connect/authorize" method="POST">
+        <input type="hidden" name="app_id" value="{{ client_app.app_id }}">
+        <input type="hidden" name="callback_url" value="{{ callback_url }}">
+        <input type="hidden" name="state" value="{{ state }}">
+
+        {% if user %}
+          <div style="background: var(--primary-teal-light); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem;">
+            Logged in as: <strong>{{ user.full_name }}</strong> ({{ user.client_code }})
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 1rem;">Authorize Access</button>
+        {% else %}
+          <h4 style="font-weight: 600; font-size: 0.95rem; margin-bottom: 8px;">Login to Authorize:</h4>
+          <input type="text" name="mobile" class="form-control" placeholder="Mobile Number (e.g. 9000000001)" required value="9000000001">
+          <input type="password" name="password" class="form-control" placeholder="Password (e.g. demo123)" required value="demo123">
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 1rem; margin-top: 8px;">Log In & Authorize</button>
+        {% endif %}
+      </form>
+    {% endif %}
+  </div>
+</body>
+</html>

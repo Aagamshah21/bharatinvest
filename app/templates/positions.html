@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% set page_title = "Intraday Positions" %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <div style="font-size: 0.9rem; color: var(--text-muted);">Intraday Realized & Unrealized P&L</div>
+      <div style="font-size: 1.8rem; font-weight: 700; margin-top: 4px;" class="{% if total_pnl >= 0 %}val-gain{% else %}val-loss{% endif %}">
+        {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl | currency }}
+      </div>
+    </div>
+    <div>
+      <span class="client-badge" style="font-size: 1rem; padding: 8px 16px;">Product: INTRADAY (MIS)</span>
+    </div>
+  </div>
+</div>
+
+<div class="table-container">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Symbol</th>
+        <th>Product</th>
+        <th>Quantity</th>
+        <th>Avg Price (INR)</th>
+        <th>LTP (INR)</th>
+        <th>Invested / Margin</th>
+        <th>P&L (INR)</th>
+        <th>P&L %</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pos in positions %}
+        {% set inst = pos.instrument %}
+        {% set ltp = inst.current_price %}
+        {% set invested = (pos.quantity | abs) * pos.average_price %}
+        {% set current_val = (pos.quantity | abs) * ltp %}
+        {% set pnl = (current_val - invested) if pos.quantity >= 0 else (invested - current_val) %}
+        {% set pnl_pct = (pnl / invested * 100) if invested > 0 else 0 %}
+        <tr data-symbol="{{ inst.symbol }}">
+          <td>
+            <a href="/instrument/{{ inst.symbol }}" style="font-weight: 700; color: var(--primary-teal); text-decoration: none;">{{ inst.symbol }}</a>
+          </td>
+          <td><span class="client-badge">{{ pos.product_type }}</span></td>
+          <td style="font-weight: 700; color: {% if pos.quantity > 0 %}var(--green-gain){% else %}var(--red-loss){% endif %};">
+            {{ pos.quantity }}
+          </td>
+          <td>{{ pos.average_price | currency }}</td>
+          <td class="live-price" style="font-weight: 700;">{{ ltp | currency }}</td>
+          <td>{{ invested | currency }}</td>
+          <td>
+            <span class="{% if pnl >= 0 %}val-gain{% else %}val-loss{% endif %}">
+              {% if pnl >= 0 %}+{% endif %}{{ pnl | currency }}
+            </span>
+          </td>
+          <td>
+            <span class="{% if pnl_pct >= 0 %}badge-gain{% else %}badge-loss{% endif %}">
+              {% if pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(pnl_pct) }}%
+            </span>
+          </td>
+          <td>
+            <button onclick="openBuySellModal('{{ inst.symbol }}', '{% if pos.quantity > 0 %}SELL{% else %}BUY{% endif %}', {{ ltp }}, 'INTRADAY', {{ pos.quantity | abs }})" class="btn btn-outline" style="padding: 4px 10px; font-size: 0.8rem;">
+              Square Off
+            </button>
+          </td>
+        </tr>
+      {% endfor %}
+      {% if not positions %}
+        <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 32px;">No active intraday positions currently open.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% set page_title = "Stock & ETF Monthly SIPs" %}
+
+{% block content %}
+<!-- Create SIP Card -->
+<div class="card" style="margin-bottom: 32px;">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px; color: var(--primary-teal);">➕ Create New Monthly SIP</h3>
+  <form id="createSipForm" onsubmit="submitCreateSip(event)" style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;">
+    <div style="flex: 2; min-width: 200px;">
+      <label style="display: block; font-weight: 600; margin-bottom: 6px;">Select Stock / ETF</label>
+      <select name="symbol" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);">
+        {% for inst in all_instruments %}
+          <option value="{{ inst.symbol }}">{{ inst.symbol }} - {{ inst.name }} (LTP: ₹{{ "%.2f"|format(inst.current_price) }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="flex: 1; min-width: 150px;">
+      <label style="display: block; font-weight: 600; margin-bottom: 6px;">Monthly Amount (INR)</label>
+      <input type="number" name="monthly_amount" min="100" value="2000" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);" required>
+    </div>
+
+    <div style="flex: 1; min-width: 150px;">
+      <label style="display: block; font-weight: 600; margin-bottom: 6px;">Day of Month</label>
+      <select name="day_of_month" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);">
+        <option value="1">1st of every month</option>
+        <option value="5">5th of every month</option>
+        <option value="15">15th of every month</option>
+        <option value="25">25th of every month</option>
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="padding: 10px 24px;">Start SIP</button>
+  </form>
+</div>
+
+<!-- Active SIPs List -->
+<div class="card">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px;">🔄 Active Systematic Investment Plans</h3>
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>SIP ID</th>
+          <th>Instrument</th>
+          <th>Monthly Amount</th>
+          <th>Execution Day</th>
+          <th>Status</th>
+          <th>Last Executed</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sip in sips %}
+          {% set inst = sip.instrument %}
+          <tr>
+            <td><code>#{{ sip.id }}</code></td>
+            <td>
+              <a href="/instrument/{{ inst.symbol }}" style="font-weight: 700; color: var(--primary-teal); text-decoration: none;">{{ inst.symbol }}</a>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">{{ inst.name }}</div>
+            </td>
+            <td style="font-weight: 700;">{{ sip.monthly_amount | currency }}</td>
+            <td>Every {{ sip.day_of_month }}th of month</td>
+            <td>
+              <span class="{% if sip.status == 'ACTIVE' %}badge-gain{% else %}badge-loss{% endif %}">
+                {{ sip.status }}
+              </span>
+            </td>
+            <td>
+              {% if sip.last_executed_at %}
+                {{ sip.last_executed_at.strftime("%Y-%m-%d %H:%M") }}
+              {% else %}
+                Pending Next Cycle
+              {% endif %}
+            </td>
+            <td>
+              {% if sip.status == 'ACTIVE' %}
+                <button onclick="cancelSip({{ sip.id }})" class="btn btn-outline" style="padding: 4px 10px; font-size: 0.8rem; color: var(--red-loss);">Cancel SIP</button>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        {% if not sips %}
+          <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">No active SIPs found. Create your first SIP above!</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function submitCreateSip(e) {
+  e.preventDefault();
+  const formData = new FormData(document.getElementById('createSipForm'));
+  fetch('/action/sip/create', { method: 'POST', body: formData })
+    .then(r => r.json())
+    .then(res => { if (res.success) window.location.reload(); });
+}
+
+function cancelSip(sipId) {
+  fetch('/action/sip/cancel/' + sipId, { method: 'POST' })
+    .then(r => r.json())
+    .then(res => { if (res.success) window.location.reload(); });
+}
+</script>
+{% endblock %}

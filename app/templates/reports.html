@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% set page_title = "Tax Reports & Trade Statements" %}
+
+{% block content %}
+<!-- Capital Gains Summary Header -->
+<div class="card" style="margin-bottom: 32px;">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px;">📊 Capital Gains Summary</h3>
+  <div class="grid-cols-4">
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Realized STCG (Short-Term)</div>
+      <div style="font-size: 1.4rem; font-weight: 700; margin-top: 4px;" class="{% if stcg_realized >= 0 %}val-gain{% else %}val-loss{% endif %}">
+        {{ stcg_realized | currency }}
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Realized LTCG (Long-Term)</div>
+      <div style="font-size: 1.4rem; font-weight: 700; margin-top: 4px;" class="{% if ltcg_realized >= 0 %}val-gain{% else %}val-loss{% endif %}">
+        {{ ltcg_realized | currency }}
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Unrealized STCG</div>
+      <div style="font-size: 1.4rem; font-weight: 700; margin-top: 4px;" class="{% if stcg_unrealized >= 0 %}val-gain{% else %}val-loss{% endif %}">
+        {{ stcg_unrealized | currency }}
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Unrealized LTCG</div>
+      <div style="font-size: 1.4rem; font-weight: 700; margin-top: 4px;" class="{% if ltcg_unrealized >= 0 %}val-gain{% else %}val-loss{% endif %}">
+        {{ ltcg_unrealized | currency }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Trade History Statement -->
+<div class="card" style="margin-bottom: 32px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h3 style="font-weight: 700; font-size: 1.2rem;">📝 Trade History Log</h3>
+    <a href="/reports/trades/csv" class="btn btn-outline" style="padding: 6px 14px; font-size: 0.88rem;">📥 Export Trades CSV</a>
+  </div>
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Trade ID</th>
+          <th>Order ID</th>
+          <th>Symbol</th>
+          <th>Type</th>
+          <th>Quantity</th>
+          <th>Trade Price</th>
+          <th>Total Value</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in trades %}
+          {% set inst = t.instrument %}
+          <tr>
+            <td><code>#{{ t.id }}</code></td>
+            <td><code>#{{ t.order_id }}</code></td>
+            <td><strong>{{ inst.symbol }}</strong></td>
+            <td><span class="{% if t.transaction_type == 'BUY' %}badge-gain{% else %}badge-loss{% endif %}">{{ t.transaction_type }}</span></td>
+            <td>{{ t.quantity }}</td>
+            <td>{{ t.price | currency }}</td>
+            <td>{{ (t.quantity * t.price) | currency }}</td>
+            <td style="font-size: 0.85rem;">{{ t.executed_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Portfolio P&L Statement -->
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h3 style="font-weight: 700; font-size: 1.2rem;">📈 Portfolio P&L Statement</h3>
+    <a href="/reports/pnl/csv" class="btn btn-outline" style="padding: 6px 14px; font-size: 0.88rem;">📥 Export P&L CSV</a>
+  </div>
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>ISIN</th>
+          <th>Category</th>
+          <th>Qty</th>
+          <th>Avg Cost</th>
+          <th>LTP</th>
+          <th>Invested Value</th>
+          <th>Current Value</th>
+          <th>Unrealized P&L</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in holdings %}
+          {% set inst = h.instrument %}
+          {% set inv = h.quantity * h.average_price %}
+          {% set curr = h.quantity * inst.current_price %}
+          {% set pnl = curr - inv %}
+          {% set pnl_pct = (pnl / inv * 100) if inv > 0 else 0 %}
+          <tr>
+            <td><strong>{{ inst.symbol }}</strong></td>
+            <td><code>{{ inst.isin }}</code></td>
+            <td><span class="client-badge">{{ inst.category }}</span></td>
+            <td>{{ h.quantity }}</td>
+            <td>{{ h.average_price | currency }}</td>
+            <td>{{ inst.current_price | currency }}</td>
+            <td>{{ inv | currency }}</td>
+            <td>{{ curr | currency }}</td>
+            <td>
+              <span class="{% if pnl >= 0 %}val-gain{% else %}val-loss{% endif %}" style="font-weight: 700;">
+                {% if pnl >= 0 %}+{% endif %}{{ pnl | currency }} ({{ "%.2f"|format(pnl_pct) }}%)
+              </span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

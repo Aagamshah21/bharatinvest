@@ -1,0 +1,44 @@
+<aside class="sidebar">
+  <div class="brand-header">
+    <div class="brand-logo-icon">B</div>
+    <div class="brand-name">Bharat<span>Invest</span></div>
+  </div>
+  <ul class="nav-links">
+    <li class="nav-item {% if request.url.path == '/home' %}active{% endif %}">
+      <a href="/home">📊 Home</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/explore' %}active{% endif %}">
+      <a href="/explore">🔍 Explore</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/watchlists' %}active{% endif %}">
+      <a href="/watchlists">⭐ Watchlists</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/holdings' %}active{% endif %}">
+      <a href="/holdings">💼 Holdings</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/positions' %}active{% endif %}">
+      <a href="/positions">📈 Positions</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/orders' %}active{% endif %}">
+      <a href="/orders">📜 Orders</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/funds' %}active{% endif %}">
+      <a href="/funds">💳 Funds</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/reports' %}active{% endif %}">
+      <a href="/reports">📑 Reports</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/insights' %}active{% endif %}">
+      <a href="/insights">💡 Insights</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/sips' %}active{% endif %}">
+      <a href="/sips">🔄 SIPs</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/profile' %}active{% endif %}">
+      <a href="/profile">👤 Profile & Apps</a>
+    </li>
+    <li class="nav-item {% if request.url.path == '/admin' %}active{% endif %}">
+      <a href="/admin">⚙️ Admin Control</a>
+    </li>
+  </ul>
+</aside>

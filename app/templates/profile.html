@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% set page_title = "Profile & Connected Apps" %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 32px;">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 20px; color: var(--primary-teal);">👤 User Profile & Demat Details</h3>
+  <div class="grid-cols-3">
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Client Code</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">{{ user.client_code }}</div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Full Name</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px; display: flex; align-items: center; gap: 8px;">
+        {% if user.picture_url %}
+          <img src="{{ user.picture_url }}" alt="Avatar" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
+        {% endif %}
+        <span>{{ user.full_name }}</span>
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Mobile Number</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">{{ user.mobile or "Linked via Google" }}</div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Email Address</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">{{ user.email }}</div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Masked PAN</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;"><code>{{ user.pan_masked }}</code></div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Demat Account Number</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;"><code>{{ user.demat_account }}</code></div>
+    </div>
+  </div>
+</div>
+
+<!-- Connected External Apps -->
+<div class="card">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px;">🔗 Connected Partner Applications</h3>
+  <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+    These third-party applications (like Portfolio Aggregators) have authorization to read your BharatInvest portfolio data. You can revoke access at any time.
+  </p>
+
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Application Name</th>
+          <th>App ID</th>
+          <th>Scope / Permissions</th>
+          <th>Token Expiry</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for app in connected_apps %}
+          <tr>
+            <td><strong>{{ app.app_name }}</strong></td>
+            <td><code>{{ app.app_id }}</code></td>
+            <td><span class="client-badge">{{ app.scope }}</span></td>
+            <td style="font-size: 0.85rem;">{{ app.expires_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            <td>
+              <button onclick="revokeAppAccess('{{ app.token }}')" class="btn btn-danger" style="padding: 4px 12px; font-size: 0.82rem;">
+                Revoke Access
+              </button>
+            </td>
+          </tr>
+        {% endfor %}
+        {% if not connected_apps %}
+          <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No third-party partner apps currently have access to your account.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function revokeAppAccess(tokenStr) {
+  if (!confirm("Are you sure you want to revoke access for this application?")) return;
+  const formData = new FormData();
+  formData.append('token', tokenStr);
+  fetch('/action/app/revoke', { method: 'POST', body: formData })
+    .then(r => r.json())
+    .then(res => { if (res.success) window.location.reload(); });
+}
+</script>
+{% endblock %}

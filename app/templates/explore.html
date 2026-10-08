@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% set page_title = "Explore Instruments" %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 24px;">
+  <form action="/explore" method="GET" style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center;">
+    <div style="flex: 2; min-width: 250px;">
+      <input type="text" name="q" value="{{ search_query }}" placeholder="Search by stock name, symbol or sector..." class="form-control" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);">
+    </div>
+    
+    <div style="flex: 1; min-width: 150px;">
+      <select name="cat" onchange="this.form.submit()" class="form-control" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);">
+        {% for c in categories %}
+          <option value="{{ c }}" {% if selected_cat == c %}selected{% endif %}>Category: {{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="flex: 1; min-width: 150px;">
+      <select name="sort" onchange="this.form.submit()" class="form-control" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);">
+        <option value="change_desc" {% if selected_sort == 'change_desc' %}selected{% endif %}>Sort: Top Movers</option>
+        <option value="price_desc" {% if selected_sort == 'price_desc' %}selected{% endif %}>Sort: Price High to Low</option>
+        <option value="price_asc" {% if selected_sort == 'price_asc' %}selected{% endif %}>Sort: Price Low to High</option>
+        <option value="volume_desc" {% if selected_sort == 'volume_desc' %}selected{% endif %}>Sort: Highest Volume</option>
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="padding: 12px 24px;">Search</button>
+  </form>
+</div>
+
+<div class="table-container">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Instrument</th>
+        <th>Category</th>
+        <th>Sector</th>
+        <th>ISIN</th>
+        <th>LTP (INR)</th>
+        <th>Day Change</th>
+        <th>Volume</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inst in instruments %}
+        {% set chg = inst.current_price - inst.prev_close %}
+        {% set chg_pct = (chg / inst.prev_close * 100) if inst.prev_close > 0 else 0 %}
+        <tr data-symbol="{{ inst.symbol }}">
+          <td>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <a href="/instrument/{{ inst.symbol }}" style="font-weight: 700; color: var(--primary-teal); text-decoration: none; font-size: 1.05rem;">
+                {{ inst.symbol }}
+              </a>
+              {% if holdings_map and holdings_map.get(inst.symbol) %}
+                <span style="background: rgba(16, 185, 129, 0.12); color: var(--green-gain); font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">
+                  💼 {{ holdings_map.get(inst.symbol) }} Owned
+                </span>
+              {% endif %}
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">{{ inst.name }}</div>
+          </td>
+          <td>
+            <span style="background: var(--primary-teal-light); color: var(--primary-teal); padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 0.8rem;">
+              {{ inst.category }}
+            </span>
+          </td>
+          <td>{{ inst.sector }}</td>
+          <td><code style="font-size: 0.82rem;">{{ inst.isin }}</code></td>
+          <td>
+            <span class="live-price" style="font-weight: 700;">{{ inst.current_price | currency }}</span>
+          </td>
+          <td>
+            <span class="live-change {% if chg >= 0 %}badge-gain{% else %}badge-loss{% endif %}">
+              {% if chg >= 0 %}+{% endif %}{{ "%.2f"|format(chg) }} ({{ "%.2f"|format(chg_pct) }}%)
+            </span>
+          </td>
+          <td class="live-vol">{{ "{:,}".format(inst.volume) }}</td>
+          <td>
+            <div style="display: flex; gap: 6px;">
+              <button onclick="openBuySellModal('{{ inst.symbol }}', 'BUY', {{ inst.current_price }})" class="btn btn-success" style="padding: 6px 12px; font-size: 0.85rem;">BUY</button>
+              <button onclick="openBuySellModal('{{ inst.symbol }}', 'SELL', {{ inst.current_price }})" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85rem;">
+                SELL{% if holdings_map and holdings_map.get(inst.symbol) %} ({{ holdings_map.get(inst.symbol) }}){% endif %}
+              </button>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

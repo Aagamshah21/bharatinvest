@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+*.sqlite
+.pytest_cache/
+.vscode/
+.idea/
+*.log
+*.db-shm
+*.db-wal

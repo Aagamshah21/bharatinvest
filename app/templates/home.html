@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% set page_title = "Portfolio Overview" %}
+
+{% block content %}
+<!-- Portfolio Summary Cards -->
+<div class="grid-cols-3" style="margin-bottom: 32px;">
+  <div class="card" style="background: linear-gradient(135deg, var(--bg-card), var(--primary-teal-light));">
+    <div style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;">Total Portfolio Value</div>
+    <div id="summaryTotalCurrent" style="font-size: 2rem; font-weight: 700; margin: 8px 0; color: var(--text-main);">
+      {{ summary.total_current | currency }}
+    </div>
+    <div style="font-size: 0.85rem; color: var(--text-muted);">
+      Invested: <strong id="summaryTotalInvested">{{ summary.total_invested | currency }}</strong>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;">1-Day Return</div>
+    <div id="summaryDayGain" style="font-size: 1.8rem; font-weight: 700; margin: 8px 0;" class="{% if summary.day_gain_abs >= 0 %}val-gain{% else %}val-loss{% endif %}">
+      {% if summary.day_gain_abs >= 0 %}+{% endif %}{{ summary.day_gain_abs | currency }}
+    </div>
+    <div>
+      <span id="summaryDayReturnPct" class="{% if summary.day_return_pct >= 0 %}badge-gain{% else %}badge-loss{% endif %}">
+        {% if summary.day_return_pct >= 0 %}+{% endif %}{{ "%.2f"|format(summary.day_return_pct) }}%
+      </span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500;">Total Return</div>
+    <div id="summaryTotalReturn" style="font-size: 1.8rem; font-weight: 700; margin: 8px 0;" class="{% if summary.total_return_abs >= 0 %}val-gain{% else %}val-loss{% endif %}">
+      {% if summary.total_return_abs >= 0 %}+{% endif %}{{ summary.total_return_abs | currency }}
+    </div>
+    <div>
+      <span id="summaryTotalReturnPct" class="{% if summary.total_return_pct >= 0 %}badge-gain{% else %}badge-loss{% endif %}">
+        {% if summary.total_return_pct >= 0 %}+{% endif %}{{ "%.2f"|format(summary.total_return_pct) }}%
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Delivery Holdings Section -->
+{% if holdings %}
+<div class="card" style="margin-bottom: 32px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <div>
+      <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-main); margin: 0;">💼 Your Delivery Holdings ({{ holdings|length }})</h3>
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Real-time valuation of your stock investments</div>
+    </div>
+    <a href="/holdings" class="btn btn-outline" style="padding: 6px 14px; font-size: 0.85rem;">View Full Holdings &rarr;</a>
+  </div>
+
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Instrument</th>
+          <th>Qty</th>
+          <th>Avg Price</th>
+          <th>LTP</th>
+          <th>Current Value</th>
+          <th>Total P&L</th>
+          <th>Quick Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in holdings[:5] %}
+          {% set inst = h.instrument %}
+          {% set ltp = inst.current_price %}
+          {% set inv = h.quantity * h.average_price %}
+          {% set curr = h.quantity * ltp %}
+          {% set pnl = curr - inv %}
+          {% set pnl_pct = (pnl / inv * 100) if inv > 0 else 0 %}
+          <tr data-symbol="{{ inst.symbol }}" data-qty="{{ h.quantity }}" data-avg="{{ h.average_price }}">
+            <td>
+              <a href="/instrument/{{ inst.symbol }}" style="font-weight: 700; color: var(--primary-teal); text-decoration: none;">{{ inst.symbol }}</a>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">{{ inst.name }}</div>
+            </td>
+            <td style="font-weight: 700;">{{ h.quantity }}</td>
+            <td>{{ h.average_price | currency }}</td>
+            <td class="live-price" style="font-weight: 700;">{{ ltp | currency }}</td>
+            <td class="holding-curr" style="font-weight: 600;">{{ curr | currency }}</td>
+            <td class="holding-pnl">
+              <div class="pnl-abs {% if pnl >= 0 %}val-gain{% else %}val-loss{% endif %}" style="font-weight: 700;">
+                {% if pnl >= 0 %}+{% endif %}{{ pnl | currency }}
+              </div>
+              <span class="pnl-pct {% if pnl_pct >= 0 %}badge-gain{% else %}badge-loss{% endif %}">
+                {% if pnl_pct >= 0 %}+{% endif %}{{ "%.2f"|format(pnl_pct) }}%
+              </span>
+            </td>
+            <td>
+              <div style="display: flex; gap: 6px;">
+                <button onclick="openBuySellModal('{{ inst.symbol }}', 'BUY', {{ ltp }})" class="btn btn-success" style="padding: 4px 10px; font-size: 0.8rem;">BUY MORE</button>
+                <button onclick="openBuySellModal('{{ inst.symbol }}', 'SELL', {{ ltp }})" class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;">SELL</button>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Market Indices Section -->
+<h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 16px;">Market Indices</h3>
+<div class="grid-cols-3" style="margin-bottom: 32px;">
+  {% for idx in indices %}
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 700; font-size: 1.1rem;">{{ idx.name }}</span>
+        <span class="{% if idx.change >= 0 %}badge-gain{% else %}badge-loss{% endif %}">
+          {% if idx.change >= 0 %}+{% endif %}{{ "%.2f"|format(idx.pct) }}%
+        </span>
+      </div>
+      <div style="font-size: 1.5rem; font-weight: 700; margin-top: 12px;">
+        {{ "%.2f"|format(idx.value) }}
+      </div>
+      <div style="font-size: 0.85rem; margin-top: 4px;" class="{% if idx.change >= 0 %}val-gain{% else %}val-loss{% endif %}">
+        {% if idx.change >= 0 %}+{% endif %}{{ "%.2f"|format(idx.change) }} pts
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Top Movers Section -->
+<div class="grid-cols-2" style="margin-bottom: 32px;">
+  <!-- Top Gainers -->
+  <div class="card">
+    <h4 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 16px; color: var(--green-gain);">🚀 Top Gainers</h4>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      {% for inst in top_gainers %}
+        {% set chg = inst.current_price - inst.prev_close %}
+        {% set chg_pct = (chg / inst.prev_close * 100) if inst.prev_close > 0 else 0 %}
+        <div data-symbol="{{ inst.symbol }}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-main); border-radius: 8px;">
+          <div>
+            <a href="/instrument/{{ inst.symbol }}" style="font-weight: 700; color: var(--text-main); text-decoration: none;">{{ inst.symbol }}</a>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">{{ inst.name }}</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="live-price" style="font-weight: 700;">{{ inst.current_price | currency }}</div>
+            <div class="badge-gain live-change">+{{ "%.2f"|format(chg_pct) }}%</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Top Losers -->
+  <div class="card">
+    <h4 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 16px; color: var(--red-loss);">🔻 Top Losers</h4>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      {% for inst in top_losers %}
+        {% set chg = inst.current_price - inst.prev_close %}
+        {% set chg_pct = (chg / inst.prev_close * 100) if inst.prev_close > 0 else 0 %}
+        <div data-symbol="{{ inst.symbol }}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-main); border-radius: 8px;">
+          <div>
+            <a href="/instrument/{{ inst.symbol }}" style="font-weight: 700; color: var(--text-main); text-decoration: none;">{{ inst.symbol }}</a>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">{{ inst.name }}</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="live-price" style="font-weight: 700;">{{ inst.current_price | currency }}</div>
+            <div class="badge-loss live-change">{{ "%.2f"|format(chg_pct) }}%</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Stocks in News -->
+<div class="card">
+  <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 16px;">📰 Stocks in News</h3>
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    {% for item in news %}
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
+        <div>
+          <a href="/instrument/{{ item.symbol }}" style="font-weight: 600; font-size: 1rem; color: var(--text-main); text-decoration: none;">
+            {{ item.headline }}
+          </a>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+            <span style="background: var(--primary-teal-light); color: var(--primary-teal); padding: 2px 8px; border-radius: 4px; font-weight: 600;">{{ item.symbol }}</span>
+            • {{ item.tag }} • {{ item.time }}
+          </div>
+        </div>
+        <a href="/instrument/{{ item.symbol }}" class="btn btn-outline" style="padding: 6px 12px; font-size: 0.85rem;">View</a>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

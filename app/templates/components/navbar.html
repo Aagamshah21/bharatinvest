@@ -1,0 +1,26 @@
+<header class="top-header">
+  <div style="font-weight: 600; font-size: 1.1rem;">
+    {% if page_title %}{{ page_title }}{% else %}BharatInvest Broker{% endif %}
+  </div>
+  <div class="header-user-info">
+    {% if user %}
+      <div style="display: flex; align-items: center; gap: 8px; background: var(--bg-card); padding: 4px 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+        <span style="color: var(--text-muted);">Funds:</span>
+        <strong id="navWalletBalance" style="color: var(--primary-teal); font-weight: 700;">
+          {% if user.wallet %}{{ user.wallet.balance | currency }}{% else %}₹0.00{% endif %}
+        </strong>
+        <a href="/funds" class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; text-decoration: none;">+ Add</a>
+      </div>
+      <button onclick="openGlobalTradeModal()" class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">⚡ Quick Trade</button>
+      <span class="client-badge">{{ user.client_code }}</span>
+      {% if user.picture_url %}
+        <img src="{{ user.picture_url }}" alt="Avatar" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color); vertical-align: middle;">
+      {% endif %}
+      <span style="font-weight: 500;">{{ user.full_name }}</span>
+      <a href="/logout" style="color: var(--text-muted); font-size: 0.9rem; text-decoration: none; margin-left: 8px;">Logout</a>
+    {% else %}
+      <a href="/login" class="btn btn-outline" style="padding: 6px 14px;">Login</a>
+    {% endif %}
+    <button id="themeToggleBtn" class="theme-toggle-btn">🌙 Dark</button>
+  </div>
+</header>

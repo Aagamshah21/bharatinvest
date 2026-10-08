@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin & Sandbox Controls | BharatInvest</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <style>
+    .toggle-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+    }
+  </style>
+</head>
+<body style="background: var(--bg-main);">
+  <div style="max-width: 1200px; margin: 0 auto; padding: 40px 20px;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+      <div>
+        <h1 style="font-size: 2rem; font-weight: 700; color: var(--text-main);">⚙️ Admin & Demo Sandbox Controls</h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">BharatInvest Mock Broker System Administration</p>
+      </div>
+      <div>
+        <a href="/home" class="btn btn-outline">← Back to App</a>
+        {% if authenticated %}
+          <a href="/admin/logout" class="btn btn-outline" style="color: var(--red-loss);">Logout Admin</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if not authenticated %}
+      <!-- Admin Login Form -->
+      <div class="card" style="max-width: 420px; margin: 40px auto;">
+        <h3 style="font-weight: 700; font-size: 1.3rem; margin-bottom: 16px;">Admin Authentication</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Default password: <code>admin123</code></p>
+        
+        {% if error %}
+          <div style="background: var(--red-loss-bg); color: var(--red-loss); padding: 10px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem;">
+            {{ error }}
+          </div>
+        {% endif %}
+
+        <form action="/admin/login" method="POST">
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; font-weight: 600; margin-bottom: 6px;">Admin Password</label>
+            <input type="password" name="password" required class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);" value="admin123">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px;">Login to Admin Panel</button>
+        </form>
+      </div>
+
+    {% else %}
+
+      <!-- System Environment Toggles -->
+      <div class="card" style="margin-bottom: 32px;">
+        <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 20px;">🎛️ System Flags & Simulator Toggles</h3>
+        <div class="grid-cols-2">
+          
+          <div class="toggle-card">
+            <div>
+              <div style="font-weight: 700;">Market Status</div>
+              <div style="font-size: 0.82rem; color: var(--text-muted);">Freeze price random walk simulator</div>
+            </div>
+            <button onclick="toggleFlag('market_open')" class="btn {% if flags.market_open %}btn-success{% else %}btn-danger{% endif %}">
+              {{ 'OPEN' if flags.market_open else 'CLOSED' }}
+            </button>
+          </div>
+
+          <div class="toggle-card">
+            <div>
+              <div style="font-weight: 700;">Simulate System Outage</div>
+              <div style="font-size: 0.82rem; color: var(--text-muted);">External API returns HTTP 503</div>
+            </div>
+            <button onclick="toggleFlag('simulate_outage')" class="btn {% if flags.simulate_outage %}btn-danger{% else %}btn-outline{% endif %}">
+              {{ 'ACTIVE (503)' if flags.simulate_outage else 'OFF' }}
+            </button>
+          </div>
+
+          <div class="toggle-card">
+            <div>
+              <div style="font-weight: 700;">Slow Mode</div>
+              <div style="font-size: 0.82rem; color: var(--text-muted);">Adds 5-second latency to API responses</div>
+            </div>
+            <button onclick="toggleFlag('slow_mode')" class="btn {% if flags.slow_mode %}btn-danger{% else %}btn-outline{% endif %}">
+              {{ 'ACTIVE (5s)' if flags.slow_mode else 'OFF' }}
+            </button>
+          </div>
+
+          <div class="toggle-card">
+            <div>
+              <div style="font-weight: 700;">Flaky Mode</div>
+              <div style="font-size: 0.82rem; color: var(--text-muted);">Randomly returns 500 error on 20% calls</div>
+            </div>
+            <button onclick="toggleFlag('flaky_mode')" class="btn {% if flags.flaky_mode %}btn-danger{% else %}btn-outline{% endif %}">
+              {{ 'ACTIVE (20%)' if flags.flaky_mode else 'OFF' }}
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Quick Simulation Actions -->
+      <div class="grid-cols-2" style="margin-bottom: 32px;">
+        
+        <!-- Simulate Trade Form -->
+        <div class="card">
+          <h3 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 16px;">📈 Simulate Trade for User</h3>
+          <form id="simTradeForm" onsubmit="submitSimTrade(event)">
+            <div style="margin-bottom: 12px;">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600;">Target User</label>
+              <select name="user_id" class="form-control" style="width: 100%; padding: 8px;">
+                {% for u in users %}
+                  <option value="{{ u.id }}">{{ u.full_name }} ({{ u.client_code }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.85rem; font-weight: 600;">Symbol</label>
+                <select name="symbol" class="form-control" style="width: 100%; padding: 8px;">
+                  {% for inst in instruments %}
+                    <option value="{{ inst.symbol }}">{{ inst.symbol }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.85rem; font-weight: 600;">Transaction</label>
+                <select name="transaction_type" class="form-control" style="width: 100%; padding: 8px;">
+                  <option value="BUY">BUY</option>
+                  <option value="SELL">SELL</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.85rem; font-weight: 600;">Quantity</label>
+                <input type="number" name="quantity" value="10" min="1" required class="form-control" style="width: 100%; padding: 8px;">
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.85rem; font-weight: 600;">Price (0 = Market)</label>
+                <input type="number" name="price" value="0" step="0.05" class="form-control" style="width: 100%; padding: 8px;">
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Simulate Trade Now</button>
+          </form>
+        </div>
+
+        <!-- Direct Holding Edit & Token Expiry -->
+        <div class="card">
+          <h3 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 16px;">🔐 OAuth Token & Holding Overrides</h3>
+          
+          <!-- Expire Tokens -->
+          <div style="margin-bottom: 24px;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px;">Expire Token for Testing 401s</label>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="expireTokens(1, 'access')" class="btn btn-outline" style="font-size: 0.8rem; flex: 1;">Expire Aarav Access Token</button>
+              <button onclick="expireTokens(1, 'refresh')" class="btn btn-outline" style="font-size: 0.8rem; flex: 1; color: var(--red-loss);">Expire Aarav Refresh Token</button>
+            </div>
+          </div>
+
+          <!-- Trigger SIPs & Reset -->
+          <div style="display: flex; gap: 12px; margin-top: 24px;">
+            <button onclick="triggerSips()" class="btn btn-success" style="flex: 1;">▶️ Trigger SIPs Now</button>
+            <button onclick="resetDatabaseState()" class="btn btn-danger" style="flex: 1;">🔄 Reset Seed State</button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- External API Call Logs -->
+      <div class="card">
+        <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px;">📋 Recent External Partner API Logs (/v2/)</h3>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Log ID</th>
+                <th>Timestamp</th>
+                <th>Endpoint</th>
+                <th>Status</th>
+                <th>App ID</th>
+                <th>User ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in api_logs %}
+                <tr>
+                  <td><code>#{{ log.id }}</code></td>
+                  <td style="font-size: 0.85rem;">{{ log.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                  <td><code>{{ log.endpoint }}</code></td>
+                  <td>
+                    <span class="{% if log.status_code == 200 %}badge-gain{% else %}badge-loss{% endif %}">
+                      {{ log.status_code }}
+                    </span>
+                  </td>
+                  <td>{{ log.app_id or 'anonymous' }}</td>
+                  <td>{{ log.user_id or '-' }}</td>
+                </tr>
+              {% endfor %}
+              {% if not api_logs %}
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No external partner API calls recorded yet.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    {% endif %}
+
+  </div>
+
+<script>
+function toggleFlag(flagName) {
+  const fd = new FormData();
+  fd.append('flag_name', flagName);
+  fetch('/admin/toggle-flag', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(() => window.location.reload());
+}
+
+function submitSimTrade(e) {
+  e.preventDefault();
+  const fd = new FormData(document.getElementById('simTradeForm'));
+  fetch('/admin/simulate-trade', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+      alert(res.message || res.error);
+      if (res.success) window.location.reload();
+    });
+}
+
+function expireTokens(userId, type) {
+  const fd = new FormData();
+  fd.append('user_id', userId);
+  fd.append('token_type', type);
+  fetch('/admin/expire-tokens', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => alert(res.message));
+}
+
+function triggerSips() {
+  fetch('/admin/trigger-sips', { method: 'POST' })
+    .then(r => r.json())
+    .then(res => alert(res.message));
+}
+
+function resetDatabaseState() {
+  if (!confirm("Are you sure you want to reset the database back to initial seed data?")) return;
+  fetch('/admin/reset-state', { method: 'POST' })
+    .then(r => r.json())
+    .then(res => { alert(res.message); window.location.reload(); });
+}
+</script>
+</body>
+</html>

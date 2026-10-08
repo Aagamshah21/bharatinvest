@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% set page_title = "Funds & Ledger" %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 32px; background: linear-gradient(135deg, var(--bg-card), var(--primary-teal-light));">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+    <div>
+      <div style="font-size: 0.95rem; color: var(--text-muted); font-weight: 500;">Available Funds for Trading</div>
+      <div id="fundsPageBalance" style="font-size: 2.4rem; font-weight: 700; color: var(--text-main); margin-top: 4px;">
+        {{ wallet.balance | currency }}
+      </div>
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+        Cleared Funds • Instant UPI Deposit Enabled
+      </div>
+    </div>
+    
+    <div style="display: flex; gap: 12px;">
+      <button onclick="openAddFundsModal()" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">💳 Add Funds (UPI)</button>
+      <button onclick="openWithdrawModal()" class="btn btn-outline" style="padding: 12px 24px; font-size: 1rem;">🏦 Withdraw</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ledger Transactions -->
+<div class="card">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px;">📑 Account Ledger</h3>
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Entry ID</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Amount (INR)</th>
+          <th>Balance After</th>
+          <th>Date & Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in ledger_entries %}
+          <tr>
+            <td><code>#{{ entry.id }}</code></td>
+            <td>
+              <span class="{% if entry.amount >= 0 %}badge-gain{% else %}badge-loss{% endif %}">
+                {{ entry.type }}
+              </span>
+            </td>
+            <td>{{ entry.description }}</td>
+            <td style="font-weight: 700;" class="{% if entry.amount >= 0 %}val-gain{% else %}val-loss{% endif %}">
+              {% if entry.amount >= 0 %}+{% endif %}{{ entry.amount | currency }}
+            </td>
+            <td>{{ entry.balance_after | currency }}</td>
+            <td style="font-size: 0.85rem;">{{ entry.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Funds UPI Modal -->
+<div id="addFundsModal" class="modal-backdrop">
+  <div class="modal-card">
+    <h3 style="font-weight: 700; font-size: 1.3rem; margin-bottom: 16px;">Deposit Funds via UPI</h3>
+    <form id="addFundsForm" onsubmit="submitAddFunds(event)">
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 6px;">Amount (INR)</label>
+        <input type="number" name="amount" min="100" value="5000" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);" required>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 6px;">UPI ID / App</label>
+        <select name="payment_method" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);">
+          <option value="Google Pay">Google Pay (gpay@upi)</option>
+          <option value="PhonePe">PhonePe (ybl@upi)</option>
+          <option value="Paytm UPI">Paytm UPI (paytm@upi)</option>
+          <option value="BHIM UPI">BHIM UPI (bhim@upi)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-top: 24px;">
+        <button type="button" onclick="closeAddFundsModal()" class="btn btn-outline" style="flex: 1;">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="flex: 1;">Proceed to Pay</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Withdraw Funds Modal -->
+<div id="withdrawModal" class="modal-backdrop">
+  <div class="modal-card">
+    <h3 style="font-weight: 700; font-size: 1.3rem; margin-bottom: 16px;">Withdraw Funds to Bank</h3>
+    <form id="withdrawForm" onsubmit="submitWithdraw(event)">
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 6px;">Amount (INR)</label>
+        <input type="number" name="amount" min="100" max="{{ wallet.balance }}" value="1000" class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);" required>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 6px;">Target Bank Account</label>
+        <input type="text" name="bank_account" value="HDFC Bank - A/C XXXX4821" readonly class="form-control" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main);">
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-top: 24px;">
+        <button type="button" onclick="closeWithdrawModal()" class="btn btn-outline" style="flex: 1;">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="flex: 1;">Withdraw Funds</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openAddFundsModal() { document.getElementById('addFundsModal').classList.add('active'); }
+function closeAddFundsModal() { document.getElementById('addFundsModal').classList.remove('active'); }
+function openWithdrawModal() { document.getElementById('withdrawModal').classList.add('active'); }
+function closeWithdrawModal() { document.getElementById('withdrawModal').classList.remove('active'); }
+
+function submitAddFunds(e) {
+  e.preventDefault();
+  const formData = new FormData(document.getElementById('addFundsForm'));
+  fetch('/action/funds/add', { method: 'POST', body: formData })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success && res.new_balance) {
+        if (typeof window.broadcastWalletUpdate === 'function') {
+          window.broadcastWalletUpdate(res.new_balance);
+        }
+        if (typeof window.applyWalletUpdate === 'function') {
+          window.applyWalletUpdate(res.new_balance);
+        }
+        closeAddFundsModal();
+        // Reload to update ledger table seamlessly
+        setTimeout(() => { window.location.reload(); }, 600);
+      } else {
+        alert(res.error || 'Failed to add funds.');
+      }
+    })
+    .catch(err => {
+      alert('Error adding funds: ' + err.message);
+    });
+}
+
+function submitWithdraw(e) {
+  e.preventDefault();
+  const formData = new FormData(document.getElementById('withdrawForm'));
+  fetch('/action/funds/withdraw', { method: 'POST', body: formData })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success && res.new_balance) {
+        if (typeof window.broadcastWalletUpdate === 'function') {
+          window.broadcastWalletUpdate(res.new_balance);
+        }
+        if (typeof window.applyWalletUpdate === 'function') {
+          window.applyWalletUpdate(res.new_balance);
+        }
+        closeWithdrawModal();
+        setTimeout(() => { window.location.reload(); }, 600);
+      } else {
+        alert(res.error || 'Failed to process withdrawal.');
+      }
+    })
+    .catch(err => {
+      alert('Error processing withdrawal: ' + err.message);
+    });
+}
+</script>
+{% endblock %}

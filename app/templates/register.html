@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register | BharatInvest</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0c141c 0%, #05668d 100%);
+    }
+    .auth-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 40px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      border: 1px solid var(--border-color);
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; font-weight: 600; color: var(--text-main); }
+    .form-control { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-main); color: var(--text-main); font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div class="brand-logo-icon" style="margin: 0 auto 12px auto; width: 48px; height: 48px; font-size: 1.5rem;">B</div>
+      <h2 style="font-weight: 700; font-size: 1.6rem; color: var(--text-main);">Create Account</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">Start your simulated trading sandbox</p>
+    </div>
+
+    {% if error %}
+      <div style="background: var(--red-loss-bg); color: var(--red-loss); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; font-weight: 600;">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <form action="/register" method="POST">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" name="full_name" class="form-control" placeholder="e.g. Vikram Sharma" required>
+      </div>
+      <div class="form-group">
+        <label>Mobile Number</label>
+        <input type="text" name="mobile" class="form-control" placeholder="10-digit mobile" required>
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" name="email" class="form-control" placeholder="vikram@example.com" required>
+      </div>
+      <div class="form-group">
+        <label>PAN Number</label>
+        <input type="text" name="pan" class="form-control" placeholder="ABCDE1234F" required>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 12px;">Complete Registration</button>
+    </form>
+
+    <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: var(--text-muted);">
+      Already have an account? <a href="/login" style="color: var(--primary-teal); font-weight: 600; text-decoration: none;">Login Here</a>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% set page_title = "Portfolio Insights & Allocation" %}
+
+{% block content %}
+{% if concentration_warning %}
+  <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #b45309; padding: 16px 20px; border-radius: var(--radius-md); margin-bottom: 24px; font-weight: 600; display: flex; align-items: center; gap: 12px;">
+    <span style="font-size: 1.5rem;">⚠️</span>
+    <div>{{ concentration_warning }}</div>
+  </div>
+{% endif %}
+
+<!-- Donut Charts Grid -->
+<div class="grid-cols-2" style="margin-bottom: 32px;">
+  <!-- Asset Class Allocation -->
+  <div class="card">
+    <h3 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 16px;">📊 Asset Class Allocation</h3>
+    <div style="height: 280px; position: relative;">
+      <canvas id="assetChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Sector Allocation -->
+  <div class="card">
+    <h3 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 16px;">🏢 Sector Allocation</h3>
+    <div style="height: 280px; position: relative;">
+      <canvas id="sectorChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Top 5 Holdings Table -->
+<div class="card">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px;">🔝 Top 5 Portfolio Concentration</h3>
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Symbol</th>
+          <th>Name</th>
+          <th>Holding Quantity</th>
+          <th>LTP (INR)</th>
+          <th>Total Value</th>
+          <th>% Portfolio Weight</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in top_5_holdings %}
+          {% set weight = (item.val / total_val * 100) if total_val > 0 else 0 %}
+          <tr>
+            <td><strong>#{{ loop.index }}</strong></td>
+            <td><a href="/instrument/{{ item.symbol }}" style="font-weight: 700; color: var(--primary-teal); text-decoration: none;">{{ item.symbol }}</a></td>
+            <td>{{ item.name }}</td>
+            <td>{{ item.qty }}</td>
+            <td>{{ item.ltp | currency }}</td>
+            <td><strong>{{ item.val | currency }}</strong></td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="flex: 1; height: 8px; background: var(--bg-main); border-radius: 4px; overflow: hidden;">
+                  <div style="width: {{ weight }}%; height: 100%; background: {% if weight > 25 %}var(--red-loss){% else %}var(--primary-teal){% endif %};"></div>
+                </div>
+                <span style="font-weight: 700; font-size: 0.9rem;">{{ "%.1f"|format(weight) }}%</span>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const assetLabels = {{ asset_breakdown.keys() | list | tojson }};
+const assetValues = {{ asset_breakdown.values() | list | tojson }};
+
+const sectorLabels = {{ sector_breakdown.keys() | list | tojson }};
+const sectorValues = {{ sector_breakdown.values() | list | tojson }};
+
+const colors = ['#00a896', '#028090', '#05668d', '#02c39a', '#f4a261', '#e76f51', '#2a9d8f', '#e9c46a'];
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Asset Donut
+  new Chart(document.getElementById('assetChart'), {
+    type: 'doughnut',
+    data: {
+      labels: assetLabels,
+      datasets: [{ data: assetValues, backgroundColor: colors }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // Sector Donut
+  new Chart(document.getElementById('sectorChart'), {
+    type: 'doughnut',
+    data: {
+      labels: sectorLabels,
+      datasets: [{ data: sectorValues, backgroundColor: colors }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+});
+</script>
+{% endblock %}

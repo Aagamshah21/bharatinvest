@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% set page_title = inst.symbol ~ " - Instrument Details" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;" data-symbol="{{ inst.symbol }}">
+  <div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <h1 style="font-size: 2rem; font-weight: 700; color: var(--text-main);">{{ inst.symbol }}</h1>
+      <span style="background: var(--primary-teal-light); color: var(--primary-teal); padding: 4px 12px; border-radius: 20px; font-weight: 700; font-size: 0.85rem;">
+        {{ inst.category }}
+      </span>
+      <span style="font-size: 0.9rem; color: var(--text-muted);">ISIN: <code>{{ inst.isin }}</code></span>
+    </div>
+    <div style="font-size: 1.1rem; color: var(--text-muted); margin-top: 4px;">{{ inst.name }} • {{ inst.sector }}</div>
+  </div>
+
+  <div style="display: flex; gap: 12px;">
+    <button onclick="openBuySellModal('{{ inst.symbol }}', 'BUY', {{ inst.current_price }})" class="btn btn-success" style="padding: 12px 28px; font-size: 1.1rem; font-weight: 700;">BUY</button>
+    <button onclick="openBuySellModal('{{ inst.symbol }}', 'SELL', {{ inst.current_price }})" class="btn btn-danger" style="padding: 12px 28px; font-size: 1.1rem; font-weight: 700;">SELL</button>
+  </div>
+</div>
+
+{% if holding and holding.quantity > 0 %}
+  {% set my_inv = holding.quantity * holding.average_price %}
+  {% set my_curr = holding.quantity * inst.current_price %}
+  {% set my_pnl = my_curr - my_inv %}
+  {% set my_pnl_pct = (my_pnl / my_inv * 100) if my_inv > 0 else 0 %}
+  <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, var(--bg-card), var(--primary-teal-light)); border: 1px solid var(--primary-teal);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">💼 YOUR DELIVERY HOLDING IN {{ inst.symbol }}</div>
+        <div style="font-size: 1.4rem; font-weight: 700; margin-top: 2px;">
+          {{ holding.quantity }} Shares
+          <span style="font-size: 0.95rem; font-weight: 500; color: var(--text-muted); margin-left: 8px;">(Avg: {{ holding.average_price | currency }})</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 24px; text-align: right;">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">Invested Amount</div>
+          <div style="font-size: 1.1rem; font-weight: 700;">{{ my_inv | currency }}</div>
+        </div>
+        <div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">Current Value</div>
+          <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-main);">{{ my_curr | currency }}</div>
+        </div>
+        <div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">Total P&L</div>
+          <div style="font-size: 1.1rem; font-weight: 700;" class="{% if my_pnl >= 0 %}val-gain{% else %}val-loss{% endif %}">
+            {% if my_pnl >= 0 %}+{% endif %}{{ my_pnl | currency }} ({{ "%.2f"|format(my_pnl_pct) }}%)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="grid-cols-3" style="margin-bottom: 32px;" data-symbol="{{ inst.symbol }}">
+  <div class="card">
+    <div style="color: var(--text-muted); font-size: 0.9rem;">Current Price</div>
+    <div class="live-price" style="font-size: 2rem; font-weight: 700; margin: 6px 0;">{{ inst.current_price | currency }}</div>
+    {% set chg = inst.current_price - inst.prev_close %}
+    {% set chg_pct = (chg / inst.prev_close * 100) if inst.prev_close > 0 else 0 %}
+    <span class="live-change {% if chg >= 0 %}badge-gain{% else %}badge-loss{% endif %}">
+      {% if chg >= 0 %}+{% endif %}{{ "%.2f"|format(chg) }} ({{ "%.2f"|format(chg_pct) }}%)
+    </span>
+  </div>
+
+  <div class="card">
+    <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px;">Day Range (OHLC)</div>
+    <div style="display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 4px;">
+      <span>Open: <strong>₹{{ "%.2f"|format(inst.open_price) }}</strong></span>
+      <span>Prev Close: <strong>₹{{ "%.2f"|format(inst.prev_close) }}</strong></span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 0.95rem;">
+      <span>Low: <strong class="live-low">₹{{ "%.2f"|format(inst.low_price) }}</strong></span>
+      <span>High: <strong class="live-high">₹{{ "%.2f"|format(inst.high_price) }}</strong></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px;">52-Week Range</div>
+    <div style="display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 4px;">
+      <span>52W Low: <strong>₹{{ "%.2f"|format(inst.week_52_low) }}</strong></span>
+      <span>52W High: <strong>₹{{ "%.2f"|format(inst.week_52_high) }}</strong></span>
+    </div>
+    <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 8px;">
+      Volume: <strong>{{ "{:,}".format(inst.volume) }}</strong>
+    </div>
+  </div>
+</div>
+
+<!-- Price History Chart -->
+<div class="card" style="margin-bottom: 32px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h3 style="font-weight: 700; font-size: 1.2rem;">Price Performance Chart</h3>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-outline" onclick="filterChart(7)" style="padding: 4px 12px; font-size: 0.85rem;">1W</button>
+      <button class="btn btn-outline" onclick="filterChart(30)" style="padding: 4px 12px; font-size: 0.85rem;">1M</button>
+      <button class="btn btn-outline" onclick="filterChart(365)" style="padding: 4px 12px; font-size: 0.85rem;">1Y</button>
+      <button class="btn btn-primary" onclick="filterChart(1825)" style="padding: 4px 12px; font-size: 0.85rem;">5Y</button>
+    </div>
+  </div>
+  <div style="height: 350px;">
+    <canvas id="priceChart"></canvas>
+  </div>
+</div>
+
+<!-- Fundamentals Card -->
+<div class="card" style="margin-bottom: 32px;">
+  <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 16px;">Key Fundamentals</h3>
+  <div class="grid-cols-4">
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Market Capitalization</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">
+        {% if inst.market_cap > 0 %}₹{{ "{:,.1f}".format(inst.market_cap) }} Cr{% else %}N/A{% endif %}
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">P/E Ratio (TTM)</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">
+        {% if inst.pe_ratio > 0 %}{{ "%.2f"|format(inst.pe_ratio) }}{% else %}N/A{% endif %}
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Dividend Yield</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">
+        {{ "%.2f"|format(inst.div_yield) }}%
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Circuit Limits</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">
+        ±{{ "%.1f"|format(inst.circuit_limit_pct) }}%
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const rawDates = {{ chart_data.dates | tojson }};
+const rawCloses = {{ chart_data.closes | tojson }};
+
+let chartObj = null;
+
+function renderChart(dates, prices) {
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  if (chartObj) chartObj.destroy();
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const textColor = isDark ? '#829ab1' : '#627d98';
+
+  chartObj = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [{
+        label: '{{ inst.symbol }} Price (INR)',
+        data: prices,
+        borderColor: '#00a896',
+        backgroundColor: 'rgba(0, 168, 150, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.1,
+        pointRadius: 0,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: textColor, maxTicksLimit: 10 } },
+        y: { grid: { color: gridColor }, ticks: { color: textColor } }
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+}
+
+function filterChart(days) {
+  if (!rawDates || rawDates.length === 0) return;
+  const sliceDates = rawDates.slice(-days);
+  const slicePrices = rawCloses.slice(-days);
+  renderChart(sliceDates, slicePrices);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderChart(rawDates, rawCloses);
+});
+</script>
+{% endblock %}
