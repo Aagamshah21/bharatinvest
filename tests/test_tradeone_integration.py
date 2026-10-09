@@ -139,7 +139,7 @@ def test_starter_portfolio_theme_and_overlaps():
         db.commit()
         db.refresh(user)
 
-        holdings = seed_starter_portfolio(db, user)
+        holdings = seed_starter_portfolio(db, user, force=True)
         assert len(holdings) > 0
 
         # Check categories
@@ -190,7 +190,7 @@ def test_starter_portfolio_deterministic_across_resets():
         )
         db.add(u1)
         db.commit()
-        h1 = seed_starter_portfolio(db, u1)
+        h1 = seed_starter_portfolio(db, u1, force=True)
         portfolio_snapshot_1 = [(h.instrument.symbol, h.quantity, h.average_price) for h in h1]
 
         # Delete holdings and user to simulate DB reset
@@ -213,7 +213,7 @@ def test_starter_portfolio_deterministic_across_resets():
         )
         db.add(u2)
         db.commit()
-        h2 = seed_starter_portfolio(db, u2)
+        h2 = seed_starter_portfolio(db, u2, force=True)
         portfolio_snapshot_2 = [(h.instrument.symbol, h.quantity, h.average_price) for h in h2]
 
         assert portfolio_snapshot_1 == portfolio_snapshot_2
@@ -300,7 +300,7 @@ def test_internal_api_provision_endpoint():
     assert data["email"] == prov_email
     assert data["name"] == "Provision Test"
 
-    # Verify holdings endpoint
+    # Verify holdings endpoint: newly provisioned user has ZERO holdings
     holdings_resp = client.get(
         f"/internal/v1/users/{prov_email}/holdings",
         headers={"x-internal-key": key}
@@ -311,21 +311,11 @@ def test_internal_api_provision_endpoint():
     assert "meta" in h_data
     assert "page" in h_data["meta"]
     assert "page_size" in h_data["meta"]
-    assert "total" in h_data["meta"]
+    assert h_data["meta"]["total"] == 0
     assert "holdings" in h_data["data"]
-    assert len(h_data["data"]["holdings"]) > 0
+    assert len(h_data["data"]["holdings"]) == 0
 
-    # Test pagination
-    paginated_resp = client.get(
-        f"/internal/v1/users/{prov_email}/holdings?page=1&page_size=2",
-        headers={"x-internal-key": key}
-    )
-    assert paginated_resp.status_code == 200
-    p_data = paginated_resp.json()
-    assert len(p_data["data"]["holdings"]) == 2
-    assert p_data["meta"]["page_size"] == 2
-
-    # Test summary endpoint
+    # Test summary endpoint for user with zero trades
     summary_resp = client.get(
         f"/internal/v1/users/{prov_email}/summary",
         headers={"x-internal-key": key}
@@ -333,7 +323,32 @@ def test_internal_api_provision_endpoint():
     assert summary_resp.status_code == 200
     s_data = summary_resp.json()["data"]
     assert s_data["wallet_balance"] == "1000000.00"
-    assert s_data["holdings_count"] == h_data["meta"]["total"]
+    assert s_data["holding_count"] == 0
+    assert s_data["holdings_count"] == 0
+    assert s_data["invested"] == "0.00"
+
+    # Now execute trades for 2 instruments to test pagination and real holdings
+    db = TestSession()
+    try:
+        from app.services.order_service import place_order
+        u = db.query(User).filter(User.email == prov_email).first()
+        inst1 = db.query(Instrument).filter(Instrument.symbol == "RELIANCE").first()
+        inst2 = db.query(Instrument).filter(Instrument.symbol == "TCS").first()
+        place_order(db, u.id, inst1.id, "BUY", "MARKET", "DELIVERY", 5)
+        place_order(db, u.id, inst2.id, "BUY", "MARKET", "DELIVERY", 3)
+    finally:
+        db.close()
+
+    # Test pagination on real holdings
+    paginated_resp = client.get(
+        f"/internal/v1/users/{prov_email}/holdings?page=1&page_size=1",
+        headers={"x-internal-key": key}
+    )
+    assert paginated_resp.status_code == 200
+    p_data = paginated_resp.json()
+    assert len(p_data["data"]["holdings"]) == 1
+    assert p_data["meta"]["page_size"] == 1
+    assert p_data["meta"]["total"] == 2
 
 
 # ==============================================================================
@@ -378,7 +393,7 @@ def test_google_login_links_to_provisioned_user():
         assert user is not None
         assert user.google_sub == google_sub
         assert user.auth_provider == "google"
-        assert len(user.holdings) > 0
+        assert len(user.holdings) == 0  # Provisioned/Google user has zero fake holdings
         assert user.wallet.balance == 1000000.0
     finally:
         db.close()

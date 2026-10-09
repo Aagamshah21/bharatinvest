@@ -5,6 +5,7 @@ import hashlib
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models import User, Instrument, Holding, Wallet, LedgerEntry
 from app.shared_identity import normalize_email
 from app.services.outbox_service import enqueue_holdings_event, dispatch_outbox_event_async
@@ -25,16 +26,15 @@ def load_shared_instruments() -> List[Dict[str, Any]]:
     from app.seed_data import RAW_INSTRUMENTS
     return RAW_INSTRUMENTS
 
-def seed_starter_portfolio(db: Session, user: User) -> List[Holding]:
+def seed_starter_portfolio(db: Session, user: User, force: bool = False) -> List[Holding]:
     """
     Seed deterministic starter portfolio for new non-demo users.
-    - Provider B theme: stocks + ETFs + 1 InvIT.
-    - Include 2-3 overlapping ISINs such as RELIANCE, TCS and HDFCBANK.
-    - Same email = same holdings even after DB reset.
-    - Average price within +/-15% of current price.
-    - Starting wallet = ₹10,00,000.
-    - Do not alter seeded demo users.
+    When SEED_STARTER_PORTFOLIO is false (the default), create NO holdings.
     """
+    # If starter portfolio is disabled and not forced, create no holdings
+    if not getattr(settings, "SEED_STARTER_PORTFOLIO", False) and not force:
+        return []
+
     # Demo users (Aarav Mehta, Priya Nair) must remain unaltered
     if user.email in ("aarav@example.com", "priya@example.com") or user.mobile in ("9000000001", "9000000002"):
         return []

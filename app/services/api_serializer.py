@@ -77,7 +77,8 @@ def serialize_holding(holding, user) -> Dict[str, Any]:
     inst = holding.instrument
     qty = holding.quantity
     avg_cost = holding.average_price
-    ltp = inst.current_price
+    from app.services.price_simulator import get_live_price
+    ltp = get_live_price(inst.id, fallback_inst=inst)
     invested = qty * avg_cost
     current_val = qty * ltp
     abs_return = current_val - invested

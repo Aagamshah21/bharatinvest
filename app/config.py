@@ -46,6 +46,7 @@ class Settings:
     # Starting Funds & Portfolio Defaults
     STARTING_FUNDS: float = float(os.getenv("STARTING_FUNDS", "1000000.0"))
     SEED_STARTER_PORTFOLIO: bool = os.getenv("SEED_STARTER_PORTFOLIO", "false").lower() in ("true", "1")
+    DEMO_MODE: bool = os.getenv("DEMO_MODE", "true").lower() in ("true", "1")
 
     # Allowed Emails
     _raw_allowed = os.getenv("ALLOWED_EMAILS", "")

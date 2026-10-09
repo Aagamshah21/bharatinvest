@@ -10,10 +10,11 @@ from datetime import datetime, timezone
 
 from app.config import settings
 from app.database import get_db
-from app.models import User, Holding, Wallet, Watchlist, WatchlistItem, Instrument
+from app.models import User, Holding, Wallet, Watchlist, WatchlistItem, Instrument, LedgerEntry, Trade
 from app.shared_identity import normalize_email, generate_identity
 from app.starter_portfolio import seed_starter_portfolio
-from app.services.api_serializer import api_success, api_error, serialize_holding, fmt_str_2dec
+from app.services.holdings_service import get_real_user_holdings
+from app.services.api_serializer import api_success, api_error, serialize_holding, fmt_str_2dec, fmt_iso_ist
 
 router = APIRouter(prefix="/internal/v1", tags=["Internal"])
 
@@ -85,6 +86,7 @@ async def provision_user(
 
         user = User(
             email=norm_email,
+            password_hash="",
             full_name=identity["full_name"],
             client_code=identity["client_code"],
             mobile=identity["mobile"],
@@ -109,8 +111,23 @@ async def provision_user(
                 db.add(WatchlistItem(watchlist_id=w.id, instrument_id=inst.id))
         db.commit()
 
-        # Seed deterministic starter portfolio (wallet ₹10,00,000 + holdings + outbox event)
-        seed_starter_portfolio(db, user)
+        # Starting wallet balance (STARTING_FUNDS env var, default ₹10,00,000)
+        start_funds = float(settings.STARTING_FUNDS)
+        wallet = Wallet(user_id=user.id, balance=start_funds)
+        db.add(wallet)
+        db.add(LedgerEntry(
+            user_id=user.id,
+            amount=start_funds,
+            type="DEPOSIT",
+            description="Initial Trading Capital (Internal Provision)",
+            balance_after=start_funds
+        ))
+        db.commit()
+
+        # New users get ZERO holdings, positions, orders and trades!
+        # Deterministic starter portfolio is ONLY seeded if explicitly configured
+        if getattr(settings, "SEED_STARTER_PORTFOLIO", False):
+            seed_starter_portfolio(db, user)
 
     return api_success({
         "client_code": user.client_code,
@@ -163,9 +180,17 @@ async def get_user_holdings(
 ):
     """
     Get user holdings by normalized email.
-    MUST exactly match the existing public holdings response structure and pagination.
+    Computes real delivery holdings only from executed trades.
+    If user does not exist, returns 404 USER_NOT_FOUND.
+    If user exists but has no holdings, returns 200 with normal envelope and empty list plus totals of 0.
     """
     norm_email = normalize_email(email)
+    if not norm_email:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"success": False, "error": {"code": "USER_NOT_FOUND", "message": "User not found"}}
+        )
+
     user = db.query(User).filter(User.email == norm_email).first()
     if not user:
         raise HTTPException(
@@ -173,16 +198,34 @@ async def get_user_holdings(
             detail={"success": False, "error": {"code": "USER_NOT_FOUND", "message": f"User {email} not found"}}
         )
 
-    query = db.query(Holding).filter(Holding.user_id == user.id, Holding.quantity > 0)
-    total_count = query.count()
+    computed_holdings = get_real_user_holdings(db, user)
+    total_count = len(computed_holdings)
+    total_invested = sum(h["invested"] for h in computed_holdings)
+    total_current_val = sum(h["current_value"] for h in computed_holdings)
+    total_day_change = sum(h["day_change"] for h in computed_holdings)
+    total_pnl = total_current_val - total_invested
+    total_pnl_pct = (total_pnl / total_invested * 100) if total_invested > 0 else 0.0
 
-    holdings_slice = query.offset((page - 1) * page_size).limit(page_size).all()
-    serialized_holdings = [serialize_holding(h, user) for h in holdings_slice]
+    holdings_slice = computed_holdings[(page - 1) * page_size : page * page_size]
+    serialized = [h["serialized"] for h in holdings_slice]
 
     return api_success(
         data={
             "client_code": user.client_code,
-            "holdings": serialized_holdings
+            "holdings": serialized,
+            "total_invested": fmt_str_2dec(total_invested),
+            "current_value": fmt_str_2dec(total_current_val),
+            "total_pnl": fmt_str_2dec(total_pnl),
+            "total_pnl_percentage": fmt_str_2dec(total_pnl_pct),
+            "day_change": fmt_str_2dec(total_day_change),
+            "totals": {
+                "invested": fmt_str_2dec(total_invested),
+                "current_value": fmt_str_2dec(total_current_val),
+                "total_pnl": fmt_str_2dec(total_pnl),
+                "pnl_percentage": fmt_str_2dec(total_pnl_pct),
+                "day_change": fmt_str_2dec(total_day_change),
+                "holdings_count": total_count
+            }
         },
         meta={
             "page": page,
@@ -197,9 +240,16 @@ async def get_user_summary(
     db: Session = Depends(get_db)
 ):
     """
-    Get user portfolio summary by normalized email.
+    Get user portfolio summary by normalized email:
+    invested, current value, day change, holding count, as_of, and timestamp of last executed trade.
     """
     norm_email = normalize_email(email)
+    if not norm_email:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"success": False, "error": {"code": "USER_NOT_FOUND", "message": "User not found"}}
+        )
+
     user = db.query(User).filter(User.email == norm_email).first()
     if not user:
         raise HTTPException(
@@ -207,14 +257,24 @@ async def get_user_summary(
             detail={"success": False, "error": {"code": "USER_NOT_FOUND", "message": f"User {email} not found"}}
         )
 
-    holdings = db.query(Holding).filter(Holding.user_id == user.id, Holding.quantity > 0).all()
-    total_invested = sum(h.quantity * h.average_price for h in holdings)
-    current_value = sum(h.quantity * h.instrument.current_price for h in holdings)
+    computed_holdings = get_real_user_holdings(db, user)
+    total_invested = sum(h["invested"] for h in computed_holdings)
+    current_value = sum(h["current_value"] for h in computed_holdings)
+    total_day_change = sum(h["day_change"] for h in computed_holdings)
     total_pnl = current_value - total_invested
     pnl_pct = (total_pnl / total_invested * 100) if total_invested > 0 else 0.0
 
     wallet = db.query(Wallet).filter(Wallet.user_id == user.id).first()
     wallet_balance = wallet.balance if wallet else 0.0
+
+    last_trade = (
+        db.query(Trade)
+        .filter(Trade.user_id == user.id)
+        .order_by(Trade.executed_at.desc(), Trade.id.desc())
+        .first()
+    )
+    last_trade_at = fmt_iso_ist(last_trade.executed_at) if last_trade else None
+    as_of = fmt_iso_ist()
 
     return api_success({
         "client_code": user.client_code,
@@ -224,9 +284,16 @@ async def get_user_summary(
         "provider": getattr(settings, "PROVIDER_CODE", "b"),
         "dp_name": getattr(settings, "DP_NAME", "BharatInvest Securities"),
         "dp_id": getattr(settings, "DP_ID", "IN300002"),
-        "holdings_count": len(holdings),
+        "invested": fmt_str_2dec(total_invested),
         "total_invested": fmt_str_2dec(total_invested),
         "current_value": fmt_str_2dec(current_value),
+        "day_change": fmt_str_2dec(total_day_change),
+        "total_day_change": fmt_str_2dec(total_day_change),
+        "holding_count": len(computed_holdings),
+        "holdings_count": len(computed_holdings),
+        "as_of": as_of,
+        "last_trade_at": last_trade_at,
+        "last_executed_trade_at": last_trade_at,
         "total_pnl": fmt_str_2dec(total_pnl),
         "pnl_percentage": fmt_str_2dec(pnl_pct),
         "wallet_balance": fmt_str_2dec(wallet_balance),

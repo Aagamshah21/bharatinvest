@@ -244,9 +244,19 @@ def seed_database(db: Session = None):
                 (aarav.id, "RELIANCE", "BUY", "DELIVERY", 5, 2460.00, now - timedelta(days=60)),
                 (aarav.id, "TCS", "BUY", "DELIVERY", 10, 3720.00, now - timedelta(days=45)),
                 (aarav.id, "HDFCBANK", "BUY", "DELIVERY", 15, 1610.00, now - timedelta(days=30)),
-                (aarav.id, "NIFTYBEES", "BUY", "DELIVERY", 50, 240.00, now - timedelta(days=25)),
+                (aarav.id, "ITC", "BUY", "DELIVERY", 40, 420.00, now - timedelta(days=28)),
+                (aarav.id, "INFY", "BUY", "DELIVERY", 8, 1480.00, now - timedelta(days=26)),
+                (aarav.id, "SBIN", "BUY", "DELIVERY", 25, 780.00, now - timedelta(days=25)),
+                (aarav.id, "NIFTYBEES", "BUY", "DELIVERY", 50, 240.00, now - timedelta(days=22)),
+                (aarav.id, "EMBASSY", "BUY", "DELIVERY", 30, 340.00, now - timedelta(days=20)),
+                (aarav.id, "TATAMOTORS", "BUY", "DELIVERY", 20, 920.00, now - timedelta(days=15)),
                 (priya.id, "ICICIBANK", "BUY", "DELIVERY", 20, 1150.00, now - timedelta(days=50)),
+                (priya.id, "BHARTIARTL", "BUY", "DELIVERY", 15, 1310.00, now - timedelta(days=45)),
+                (priya.id, "PGINVIT", "BUY", "DELIVERY", 100, 98.00, now - timedelta(days=42)),
                 (priya.id, "GOLDBEES", "BUY", "DELIVERY", 40, 58.00, now - timedelta(days=40)),
+                (priya.id, "SUNPHARMA", "BUY", "DELIVERY", 12, 1680.00, now - timedelta(days=35)),
+                (priya.id, "MARUTI", "BUY", "DELIVERY", 2, 12100.00, now - timedelta(days=30)),
+                (priya.id, "TITAN", "BUY", "DELIVERY", 5, 3350.00, now - timedelta(days=25)),
             ]
             for uid, sym, t_type, p_type, qty, pr, dt_traded in sample_trades:
                 inst = inst_map[sym]

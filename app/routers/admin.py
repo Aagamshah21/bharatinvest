@@ -5,12 +5,14 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db, Base, engine
-from app.models import User, Instrument, Holding, Order, Trade, Wallet, ApiLog, SystemSettings, OAuthToken
+from app.models import User, Instrument, Holding, Order, Trade, Wallet, ApiLog, SystemSettings, OAuthToken, OutboxEvent
 from app.services.admin_service import (
     get_system_flag, set_system_flag, admin_simulate_trade,
     admin_expire_access_tokens, admin_expire_refresh_tokens, admin_edit_holding
 )
 from app.services.sip_service import execute_all_due_sips
+from app.services.holdings_service import purge_unbacked_holdings
+from app.services.outbox_service import dispatch_outbox_event_async
 
 router = APIRouter(prefix="/admin")
 
@@ -40,12 +42,27 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "flaky_mode": get_system_flag(db, "flaky_mode", "false") == "true",
     }
 
+    outbox_total = db.query(OutboxEvent).count()
+    outbox_pending = db.query(OutboxEvent).filter(OutboxEvent.status == "PENDING").count()
+    outbox_sent = db.query(OutboxEvent).filter(OutboxEvent.status == "SENT").count()
+    outbox_failed = db.query(OutboxEvent).filter(OutboxEvent.status == "FAILED").count()
+    outbox_events = db.query(OutboxEvent).order_by(OutboxEvent.created_at.desc()).limit(50).all()
+
+    outbox_stats = {
+        "total": outbox_total,
+        "pending": outbox_pending,
+        "sent": outbox_sent,
+        "failed": outbox_failed,
+        "events": outbox_events
+    }
+
     return templates.TemplateResponse(request=request, name="admin.html", context={
         "authenticated": True,
         "users": users,
         "instruments": instruments,
         "api_logs": api_logs,
         "flags": flags,
+        "outbox_stats": outbox_stats,
         "error": None
     })
 
@@ -172,4 +189,50 @@ async def reset_state_action(
     seed_database(db)
 
     return JSONResponse({"success": True, "message": "Demo accounts reset to original seed state successfully. Real accounts preserved!"})
+
+@router.post("/purge-starter-holdings")
+async def purge_starter_holdings_action(
+    request: Request,
+    user_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    if not check_admin_auth(request):
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return JSONResponse({"success": False, "error": "User not found"}, status_code=404)
+
+    removed_count = purge_unbacked_holdings(db, user)
+    return JSONResponse({
+        "success": True,
+        "message": f"Removed {removed_count} starter/unbacked holdings for {user.full_name} ({user.email}). Fired HOLDINGS_CHANGED outbox event.",
+        "count": removed_count
+    })
+
+@router.post("/resend-all-outbox")
+@router.post("/outbox/resend-all")
+async def resend_all_outbox_action(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    if not check_admin_auth(request):
+        return JSONResponse({"success": False, "error": "Unauthorized"}, status_code=401)
+
+    events = db.query(OutboxEvent).all()
+    count = len(events)
+    for ev in events:
+        ev.status = "PENDING"
+        ev.retry_count = 0
+        ev.error_message = None
+    db.commit()
+
+    for ev in events:
+        dispatch_outbox_event_async(ev.id)
+
+    return JSONResponse({
+        "success": True,
+        "message": f"Reset and queued {count} outbox events for redelivery to TradeOne hub."
+    })
+
 

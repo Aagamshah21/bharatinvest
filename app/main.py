@@ -91,3 +91,4 @@ async def health_check():
         "timestamp": fmt_iso_ist(),
         "version": "2.0.0"
     }
+
